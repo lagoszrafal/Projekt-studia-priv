@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Vaultly",
+    "slug": "vaultly",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "vaultly",
+    "icon": "./assets/vaultly-icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vaultly.app"
+    },
+    "android": {
+      "package": "com.vaultly.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/vaultly-icon.png",
+        "backgroundColor": "#0C1311"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Pozwól Vaultly użyć Face ID do odblokowania sejfu."
+        }
+      ],
+      "expo-sqlite",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a4b8fe3d-e4aa-4c7c-934a-a0591d6aab2e"
+      }
+    }
+  }
+}
