@@ -5,7 +5,7 @@ import { ExpoClipboardService } from '@/services/ClipboardService';
 import { PasswordGeneratorService } from '@/services/PasswordGeneratorService';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTheme } from '@/theme/theme';
-import { Card, PasswordStrengthMeter, SecureInput, VaultlyButton, VaultlyInput, passwordScore } from '@/components/ui';
+import { Card, PasswordStrengthMeter, SecureInput, VaultlyButton, VaultlyInput, calculatePasswordEntropy, entropyToScore } from '@/components/ui';
 
 const passwordService = new PasswordGeneratorService(new ExpoSecureRandom());
 
@@ -80,8 +80,8 @@ export function PasswordGeneratorPanel({ password, onPasswordChange }: Props) {
       ))}
     </View>
     {password ? <View style={{ gap: spacing.xs }}>
-      <PasswordStrengthMeter password={password} />
-      <Text style={[typography.caption, { color: colors.textSecondary }]}>Siła: {passwordScore(password)}/5</Text>
+      <PasswordStrengthMeter password={password} />'
+      <Text style={[typography.caption, { color: colors.textSecondary }]}>Entropia hasła: {calculatePasswordEntropy(password).entropyBits.toFixed(2)} bitów</Text>
     </View> : null}
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
       <VaultlyButton label="Kopiuj" variant="ghost" disabled={!password} onPress={copyPassword} style={{ flex: 1 }} />
