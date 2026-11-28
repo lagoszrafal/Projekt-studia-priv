@@ -4,10 +4,24 @@ import type { KdfMetadata, SecretKey } from '@/crypto/types';
 import { DatabaseCipherService } from '../DatabaseCipherService';
 
 let mockDatabaseFileSize = 0;
+let mockCipherAvailable = true;
 
 jest.mock('expo-file-system/legacy', () => ({
   getInfoAsync: jest.fn(async () => ({ exists: true, size: mockDatabaseFileSize })),
 }));
+
+jest.mock('expo-sqlite', () => {
+  const actual = jest.requireActual('expo-sqlite');
+  return {
+    ...actual,
+    openDatabaseAsync: jest.fn(async () => ({
+      getFirstAsync: jest.fn(async () => (
+        mockCipherAvailable ? { cipher_version: '4.7.0' } : null
+      )),
+      closeAsync: jest.fn(async () => {}),
+    })),
+  };
+});
 
 const kdf: KdfMetadata = {
   algorithm: 'argon2id',
@@ -19,6 +33,7 @@ const kdf: KdfMetadata = {
 };
 
 function createDb(cipherAvailable = true) {
+  mockCipherAvailable = cipherAvailable;
   const calls: string[] = [];
   const db = {
     databasePath: 'file:///cache/vaultly.db',
@@ -73,9 +88,9 @@ describe('DatabaseCipherService', () => {
 
     await service.encryptLegacyDatabase(db, key, kdf);
 
-    expect(calls[0]).toBe('PRAGMA cipher_version');
-    expect(calls[1]).toBe('PRAGMA wal_checkpoint(TRUNCATE)');
-    expect(calls[2]).toBe(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[0]).toBe('PRAGMA wal_checkpoint(TRUNCATE)');
+    expect(calls[1]).toBe(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[2]).toBe('PRAGMA cipher_version');
     expect(service.isKeyed(db)).toBe(true);
     expect(JSON.parse(read() ?? '{}')).toMatchObject({ status: 'ready', key: 'ab'.repeat(32), kdf });
   });
@@ -93,8 +108,8 @@ describe('DatabaseCipherService', () => {
 
     await service.encryptNewDatabase(db, key, kdf);
 
-    expect(calls[0]).toBe('PRAGMA cipher_version');
-    expect(calls[1]).toBe(`PRAGMA key = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[0]).toBe(`PRAGMA key = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[1]).toBe('PRAGMA cipher_version');
     expect(calls).not.toContain(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
   });
 

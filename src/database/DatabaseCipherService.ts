@@ -35,7 +35,7 @@ export class DatabaseCipherService {
 
     if (await this.isDatabaseFileEmpty(db)) {
       if (state) {
-        if (!(await this.hasSQLCipher(db))) {
+        if (!(await this.hasSQLCipher())) {
           await this.storage.remove(DATABASE_CIPHER_STATE_KEY);
           this.freshDatabases.add(db);
           return;
@@ -121,7 +121,7 @@ export class DatabaseCipherService {
     if (!canRekey && !isFresh) {
       throw new Error('Nie można zaszyfrować istniejącej bazy bez jej wcześniejszej migracji.');
     }
-    if (!(await this.hasSQLCipher(db))) {
+    if (!(await this.hasSQLCipher())) {
       throw new Error('SQLCipher nie jest dostępny. Przebuduj aplikację z obsługą SQLCipher.');
     }
     await this.storeState(nextState);
@@ -161,7 +161,7 @@ export class DatabaseCipherService {
     if (!canRekey && !isFresh) {
       throw new Error('Nie można zaszyfrować istniejącej bazy bez jej wcześniejszej migracji.');
     }
-    if (!(await this.hasSQLCipher(db))) {
+    if (!(await this.hasSQLCipher())) {
       throw new Error('SQLCipher nie jest dostępny. Przebuduj aplikację z obsługą SQLCipher.');
     }
     await this.storeState(state);
@@ -182,7 +182,7 @@ export class DatabaseCipherService {
 
   async encryptLegacyDatabase(db: SQLiteDatabase, key: SecretKey, kdf: KdfMetadata): Promise<void> {
     this.assertSupportedPlatform();
-    if (!(await this.hasSQLCipher(db))) {
+    if (!(await this.hasSQLCipher())) {
       throw new Error('SQLCipher nie jest dostępny. Przebuduj aplikację z obsługą SQLCipher.');
     }
     const state: DatabaseCipherState = {
@@ -240,15 +240,21 @@ export class DatabaseCipherService {
   }
 
   private async verifyKey(db: SQLiteDatabase): Promise<void> {
-    if (!(await this.hasSQLCipher(db))) {
+    const cipher = await db.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
+    if (!cipher?.cipher_version) {
       throw new Error('SQLCipher nie jest dostępny. Przebuduj aplikację z obsługą SQLCipher.');
     }
     await db.getFirstAsync('SELECT COUNT(*) AS count FROM sqlite_master');
   }
 
-  private async hasSQLCipher(db: SQLiteDatabase): Promise<boolean> {
-    const cipher = await db.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
-    return Boolean(cipher?.cipher_version);
+  private async hasSQLCipher(): Promise<boolean> {
+    const probe = await SQLite.openDatabaseAsync(':memory:');
+    try {
+      const cipher = await probe.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
+      return Boolean(cipher?.cipher_version);
+    } finally {
+      await probe.closeAsync();
+    }
   }
 
   private storeState(state: DatabaseCipherState): Promise<void> {
