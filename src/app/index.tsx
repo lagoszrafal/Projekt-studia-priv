@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useAuthStore } from '@/store/authStore';
 import { createAuthService } from '@/services/container';
+import { ScreenSecurityService } from '@/security/ScreenSecurityService';
 
 export default function Index() {
   const db = useSQLiteContext();
@@ -10,6 +11,7 @@ export default function Index() {
   const initialized = useAuthStore((state) => state.initialized);
   const initialize = useAuthStore((state) => state.initialize);
   const fail = useAuthStore((state) => state.fail);
+  ScreenSecurityService(true);
   useEffect(() => {
     if (initialized) return;
     createAuthService(db).hasVault().then(initialize).catch(() => fail('Nie udało się odczytać sejfu.'));

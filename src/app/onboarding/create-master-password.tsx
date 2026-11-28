@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Text, View } from 'react-native';
-import { Card, PasswordStrengthMeter, Screen, SecureInput, VaultlyButton } from '@/components/ui';
+import { Card, PasswordStrengthMeter, Screen, SecureInput, VaultlyButton, calculatePasswordEntropy } from '@/components/ui';
 import { useTheme } from '@/theme/theme';
 import { createAuthService } from '@/services/container';
 
@@ -37,6 +37,7 @@ export default function CreateMasterPasswordScreen() {
     <View style={{ gap: spacing.lg }}>
       <SecureInput label="Hasło główne" value={password} onChangeText={setPassword} textContentType="newPassword" error={tooShort ? 'Użyj co najmniej 12 znaków.' : undefined} />
       <PasswordStrengthMeter password={password} />
+      <Text style={[typography.caption, { color: colors.textSecondary }]}>Entropia hasła: {calculatePasswordEntropy(password).entropyBits.toFixed(2)} bitów</Text>
       <SecureInput label="Powtórz hasło" value={confirmation} onChangeText={setConfirmation} textContentType="newPassword" error={mismatch ? 'Hasła nie są identyczne.' : undefined} />
     </View>
     <Card><Text style={[typography.caption, { color: colors.textSecondary }]}>Hasło nie zostanie zapisane. Posłuży do wyprowadzenia klucza Argon2id, który opakuje losowy klucz sejfu.</Text></Card>
