@@ -7,6 +7,7 @@ import { VaultSession } from '@/security/VaultSession';
 import { ExpoBiometricsService } from '@/security/BiometricsService';
 import { BiometricVaultService } from '@/security/BiometricVaultService';
 import { ExpoSecureStorageService } from '@/security/SecureStorageService';
+import { DatabaseCipherService } from '@/database/DatabaseCipherService';
 import { AuthService } from './AuthService';
 import { AppDataResetService } from './AppDataResetService';
 import { ExpoClipboardService } from './ClipboardService';
@@ -14,7 +15,13 @@ import { VaultService } from './VaultService';
 
 const cryptoProvider = new ExpoCryptoProvider();
 const secureRandom = new ExpoSecureRandom();
+const secureStorage = new ExpoSecureStorageService();
+export const databaseCipherService = new DatabaseCipherService(secureStorage);
 export const vaultSession = new VaultSession(cryptoProvider);
+
+export function initializeDatabaseCipher(db: SQLiteDatabase): Promise<void> {
+  return databaseCipherService.initialize(db);
+}
 
 export function createAuthService(db: SQLiteDatabase): AuthService {
   return new AuthService(
@@ -22,6 +29,8 @@ export function createAuthService(db: SQLiteDatabase): AuthService {
     secureRandom,
     new SQLiteVaultMetadataRepository(db),
     vaultSession,
+    db,
+    databaseCipherService,
   );
 }
 
@@ -32,7 +41,7 @@ export function createVaultService(db: SQLiteDatabase): VaultService {
 export function createBiometricVaultService(): BiometricVaultService {
   return new BiometricVaultService(
     new ExpoBiometricsService(),
-    new ExpoSecureStorageService(),
+    secureStorage,
     vaultSession,
   );
 }

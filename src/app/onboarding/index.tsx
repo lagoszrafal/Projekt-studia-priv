@@ -11,7 +11,14 @@ export default function WelcomeScreen() {
       <Text style={[typography.display, { color: colors.textPrimary }]}>Twoje hasła.{`\n`}Chronione przez Ciebie.</Text>
       <Text style={[typography.body, { color: colors.textSecondary }]}>Prywatny sejf działający przede wszystkim offline.</Text>
     </View>
-    <VaultlyButton label="Rozpocznij" onPress={() => router.push('/onboarding/create-master-password')} />
+    <View style={{ gap: spacing.sm }}>
+      <VaultlyButton label="Utwórz nowy sejf" onPress={() => router.push('/onboarding/create-master-password')} />
+      <VaultlyButton
+        label="Przywróć kopię zapasową"
+        variant="secondary"
+        onPress={() => router.push('/onboarding/import-backup')}
+      />
+    </View>
   </Screen>;
 }
 const styles = StyleSheet.create({ layout: { justifyContent: 'space-between', paddingVertical: 32 } });

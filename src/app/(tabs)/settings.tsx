@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { Card, Screen, VaultlyButton } from '@/components/ui';
-import { createAppDataResetService, vaultSession } from '@/services/container';
+import { createAppDataResetService, databaseCipherService, vaultSession } from '@/services/container';
+import { exportDatabaseCopy } from '@/services/DatabaseExportService';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -50,6 +51,7 @@ function RadioChoice({ checked, label, onPress }: { checked: boolean; label: str
 export default function SettingsScreen() {
   const db = useSQLiteContext();
   const [resetting, setResetting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const selected = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
   const autoLockSeconds = useSettingsStore((state) => state.autoLockSeconds);
@@ -61,6 +63,34 @@ export default function SettingsScreen() {
   const resetForOnboarding = useAuthStore((state) => state.resetForOnboarding);
   const clearSensitiveState = useVaultStore((state) => state.clearSensitiveState);
   const { colors, spacing, typography } = useTheme();
+
+  const exportDatabase = async () => {
+    setExporting(true);
+    try {
+      if (!vaultSession.isOpen()) {
+        throw new Error('Odblokuj sejf przed eksportem kopii.');
+      }
+      await exportDatabaseCopy(db, databaseCipherService);
+    } catch (error) {
+      Alert.alert(
+        'Nie udało się wyeksportować bazy',
+        error instanceof Error ? error.message : 'Wystąpił nieznany błąd podczas eksportu.',
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const confirmDatabaseExport = () => {
+    Alert.alert(
+      'Wyeksportować kopię sejfu?',
+      'Przenośny plik .vaultly zawiera zaszyfrowaną bazę oraz parametry KDF. Do przywrócenia na tym lub innym urządzeniu będzie potrzebne hasło główne.',
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        { text: 'Eksportuj', onPress: () => { void exportDatabase(); } },
+      ],
+    );
+  };
 
   const logout = () => {
     vaultSession.lock();
@@ -120,8 +150,23 @@ export default function SettingsScreen() {
       <Card>{clipboardChoices.map((choice) => <RadioChoice key={String(choice.value ?? 'never')} checked={clipboardClearSeconds === choice.value} label={choice.label} onPress={() => setClipboardClearSeconds(choice.value)} />)}</Card>
     </View>
     <View style={{ gap: spacing.sm }}>
-      <VaultlyButton label="Wyloguj się" variant="secondary" disabled={resetting} onPress={confirmLogout} />
-      <VaultlyButton label="Usuń dane aplikacji" loading={resetting} disabled={resetting} style={{ backgroundColor: colors.danger }} onPress={confirmApplicationReset} />
+      <Text style={[typography.label, { color: colors.textPrimary }]}>Kopia zapasowa</Text>
+      <Card>
+        <Text style={[typography.body, { color: colors.textSecondary, marginBottom: spacing.md }]}>
+          Tworzy przenośną, zaszyfrowaną kopię sejfu, którą można przywrócić podczas inicjalizacji aplikacji.
+        </Text>
+        <VaultlyButton
+          label="Eksportuj bazę danych"
+          variant="secondary"
+          loading={exporting}
+          disabled={resetting}
+          onPress={confirmDatabaseExport}
+        />
+      </Card>
+    </View>
+    <View style={{ gap: spacing.sm }}>
+      <VaultlyButton label="Wyloguj się" variant="secondary" disabled={resetting || exporting} onPress={confirmLogout} />
+      <VaultlyButton label="Usuń dane aplikacji" loading={resetting} disabled={resetting || exporting} style={{ backgroundColor: colors.danger }} onPress={confirmApplicationReset} />
     </View>
   </Screen>;
 }

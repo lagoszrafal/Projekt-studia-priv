@@ -18,6 +18,10 @@ export class SQLiteVaultMetadataRepository implements VaultMetadataRepository {
   constructor(private readonly db: SQLiteDatabase) {}
 
   async exists(): Promise<boolean> {
+    const table = await this.db.getFirstAsync<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'vault_metadata'`,
+    );
+    if (!table) return false;
     const row = await this.db.getFirstAsync<{ count: number }>(
       'SELECT COUNT(*) AS count FROM vault_metadata WHERE id = 1',
     );

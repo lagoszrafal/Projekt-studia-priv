@@ -2,7 +2,7 @@ import { Redirect } from 'expo-router';
 import { useEffect } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useAuthStore } from '@/store/authStore';
-import { createAuthService } from '@/services/container';
+import { createAuthService, databaseCipherService } from '@/services/container';
 import { ScreenSecurityService } from '@/security/ScreenSecurityService';
 
 export default function Index() {
@@ -14,7 +14,25 @@ export default function Index() {
   ScreenSecurityService(true);
   useEffect(() => {
     if (initialized) return;
-    createAuthService(db).hasVault().then(initialize).catch(() => fail('Nie udało się odczytać sejfu.'));
+    async function initializeVault() {
+      try {
+        const authService = createAuthService(db);
+        let hasVault: boolean;
+        try {
+          hasVault = await authService.hasVault();
+        } catch (error) {
+          const cipherState = await databaseCipherService.getState();
+          if (!cipherState || cipherState.status === 'ready') throw error;
+          await databaseCipherService.activateStoredKey(db);
+          hasVault = await authService.hasVault();
+        }
+        initialize(hasVault);
+      } catch {
+        fail('Nie udało się odczytać sejfu.');
+      }
+    }
+
+    void initializeVault();
   }, [db, fail, initialize, initialized]);
   if (!initialized) return null;
   if (status === 'FIRST_LAUNCH') return <Redirect href="/onboarding" />;
