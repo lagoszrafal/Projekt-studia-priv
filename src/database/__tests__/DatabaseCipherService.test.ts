@@ -75,13 +75,14 @@ describe('DatabaseCipherService', () => {
 
     await service.encryptLegacyDatabase(db, key, kdf);
 
-    expect(calls[0]).toBe('PRAGMA wal_checkpoint(TRUNCATE)');
-    expect(calls[1]).toBe(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[0]).toBe('PRAGMA cipher_version');
+    expect(calls[1]).toBe('PRAGMA wal_checkpoint(TRUNCATE)');
+    expect(calls[2]).toBe(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
     expect(service.isKeyed(db)).toBe(true);
     expect(JSON.parse(read() ?? '{}')).toMatchObject({ status: 'ready', key: 'ab'.repeat(32), kdf });
   });
 
-  it('sets the key before any query on a fresh database', async () => {
+  it('sets the key before accessing schema pages on a fresh database', async () => {
     mockDatabaseFileSize = 0;
     const { storage } = createStorage();
     const { db, calls } = createDb();
@@ -94,7 +95,8 @@ describe('DatabaseCipherService', () => {
 
     await service.encryptNewDatabase(db, key, kdf);
 
-    expect(calls[0]).toBe(`PRAGMA key = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[0]).toBe('PRAGMA cipher_version');
+    expect(calls[1]).toBe(`PRAGMA key = "x'${'ab'.repeat(32)}'";`);
     expect(calls).not.toContain(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
   });
 
@@ -107,5 +109,24 @@ describe('DatabaseCipherService', () => {
 
     await service.initialize(db);
     await expect(service.encryptNewDatabase(db, key, kdf)).rejects.toThrow('SQLCipher nie jest dostępny');
+    expect(storage.set).not.toHaveBeenCalled();
+  });
+
+  it('clears an interrupted pending key when the database is still empty and SQLCipher is unavailable', async () => {
+    mockDatabaseFileSize = 0;
+    const pendingState = {
+      version: 1,
+      status: 'pending',
+      key: 'ab'.repeat(32),
+      kdf,
+    };
+    const { storage } = createStorage(JSON.stringify(pendingState));
+    const { db } = createDb(false);
+    const service = new DatabaseCipherService(storage);
+
+    await service.initialize(db);
+
+    expect(storage.remove).toHaveBeenCalledWith('vaultly.database-cipher.v1');
+    expect(service.isFreshDatabase(db)).toBe(true);
   });
 });

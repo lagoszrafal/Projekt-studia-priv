@@ -25,9 +25,10 @@ export default function CreateMasterPasswordScreen() {
       await createAuthService(db).createVault(password);
       router.replace('/onboarding/biometrics');
     } catch (error) {
+      const details = getErrorDetails(error);
       setServiceError(
-        error instanceof Error
-          ? `Nie udało się utworzyć sejfu: ${error.message}`
+        details
+          ? `Nie udało się utworzyć sejfu: ${details}`
           : 'Nie udało się utworzyć sejfu. Spróbuj ponownie.',
       );
     } finally {
@@ -48,4 +49,21 @@ export default function CreateMasterPasswordScreen() {
     {serviceError ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{serviceError}</Text> : null}
     <VaultlyButton label="Utwórz sejf" loading={loading} onPress={continueFlow} />
   </Screen>;
+}
+
+function getErrorDetails(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (typeof error !== 'object' || error === null) return String(error);
+
+  const nativeError = error as Record<string, unknown>;
+  const details: string[] = [];
+  for (const field of ['message', 'nativeErrorMessage', 'localizedDescription']) {
+    const value = nativeError[field];
+    if (typeof value === 'string' && value.length > 0) details.push(value);
+  }
+  const code = nativeError.code;
+  if (typeof code === 'string' || typeof code === 'number') details.push(`kod ${code}`);
+  if (details.length === 0) return Object.prototype.toString.call(error);
+  return details.join(' (') + (details.length > 1 ? ')' : '');
 }
