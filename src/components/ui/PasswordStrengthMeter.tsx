@@ -66,11 +66,20 @@ export function entropyToScore(entropyBits: number, length: number): number {
   return 5;
 }
 
+function scoreToStrengthLabel(score: number): string {
+  if (score <= 0) return 'Brak hasła';
+  if (score === 1) return 'Bardzo słabe';
+  if (score === 2) return 'Słabe';
+  if (score === 3) return 'Dobre';
+  if (score === 4) return 'Silne';
+  return 'Bardzo silne';
+}
+
 export function PasswordStrengthMeter({ password }: { password: string }) {
   const { colors, spacing, typography } = useTheme();
   const passwordScore = calculatePasswordEntropy(password);
   const score = entropyToScore(passwordScore.entropyBits, passwordScore.length);
   const label = 'Entropia hasła: ' + passwordScore.entropyBits.toFixed(2) + ' bitów';
-  return <View style={{ gap: spacing.sm }}><View style={styles.row}>{[1, 2, 3, 4, 5].map((item) => <View key={item} style={[styles.bar, { backgroundColor: item <= score ? colors.accent : colors.border }]} />)}</View><Text style={[typography.caption, { color: colors.textSecondary }]}>Siła hasła: {label}</Text></View>;
+  return <View style={{ gap: spacing.sm }}><View style={styles.row}>{[1, 2, 3, 4, 5].map((item) => <View key={item} style={[styles.bar, { backgroundColor: item <= score ? colors.accent : colors.border }]} />)}</View><Text style={[typography.caption, { color: colors.textSecondary }]}>Siła hasła: {scoreToStrengthLabel(score)}</Text></View>;
 }
 const styles = StyleSheet.create({ row: { flexDirection: 'row', gap: 6 }, bar: { flex: 1, height: 4, borderRadius: 4 } });
