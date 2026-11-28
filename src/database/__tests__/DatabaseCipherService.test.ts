@@ -5,10 +5,8 @@ import { DatabaseCipherService } from '../DatabaseCipherService';
 
 let mockDatabaseFileSize = 0;
 
-jest.mock('expo-file-system', () => ({
-  File: class MockFile {
-    info() { return { exists: true, size: mockDatabaseFileSize }; }
-  },
+jest.mock('expo-file-system/legacy', () => ({
+  getInfoAsync: jest.fn(async () => ({ exists: true, size: mockDatabaseFileSize })),
 }));
 
 const kdf: KdfMetadata = {

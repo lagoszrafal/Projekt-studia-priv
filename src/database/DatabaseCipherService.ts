@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
-import { File } from 'expo-file-system';
+import { getInfoAsync } from 'expo-file-system/legacy';
 import type { KdfMetadata, SecretKey } from '@/crypto/types';
 import { bytesToHex } from '@/utils/hex';
 import type { SecureStorageService } from '@/security/SecureStorageService';
@@ -56,7 +56,7 @@ export class DatabaseCipherService {
   }
 
   private async isDatabaseFileEmpty(db: SQLiteDatabase): Promise<boolean> {
-    const info = new File(db.databasePath).info();
+    const info = await getInfoAsync(db.databasePath);
     if (!info.exists) return true;
     if (typeof info.size !== 'number') {
       throw new Error('Nie można ustalić stanu lokalnej bazy danych.');
