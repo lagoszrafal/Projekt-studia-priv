@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
+import { File } from 'expo-file-system';
 import type { KdfMetadata, SecretKey } from '@/crypto/types';
 import { bytesToHex } from '@/utils/hex';
 import type { SecureStorageService } from '@/security/SecureStorageService';
@@ -17,18 +18,45 @@ type DatabaseCipherState = {
 
 export class DatabaseCipherService {
   private readonly keyedDatabases = new WeakSet<SQLiteDatabase>();
+  private readonly freshDatabases = new WeakSet<SQLiteDatabase>();
 
   constructor(private readonly storage: SecureStorageService) {}
 
   async initialize(db: SQLiteDatabase): Promise<void> {
     this.assertSupportedPlatform();
     const state = await this.getState();
-    if (!state || state.status !== 'ready') return;
+    if (state?.status === 'ready') {
+      await this.applyKey(db, state.key);
+      await this.verifyKey(db);
+      this.keyedDatabases.add(db);
+      await migrateDatabase(db);
+      return;
+    }
 
-    await this.applyKey(db, state.key);
-    await this.verifyKey(db);
-    this.keyedDatabases.add(db);
-    await migrateDatabase(db);
+    if (await this.isDatabaseFileEmpty(db)) {
+      if (state) {
+        await this.applyKey(db, state.key);
+        await this.verifyKey(db);
+        this.keyedDatabases.add(db);
+        await migrateDatabase(db);
+        await this.storeState({ ...state, status: 'ready' });
+      } else {
+        this.freshDatabases.add(db);
+      }
+    }
+  }
+
+  isFreshDatabase(db: SQLiteDatabase): boolean {
+    return this.freshDatabases.has(db);
+  }
+
+  private async isDatabaseFileEmpty(db: SQLiteDatabase): Promise<boolean> {
+    const info = new File(db.databasePath).info();
+    if (!info.exists) return true;
+    if (typeof info.size !== 'number') {
+      throw new Error('Nie można ustalić stanu lokalnej bazy danych.');
+    }
+    return info.size === 0;
   }
 
   async getState(): Promise<DatabaseCipherState | null> {
@@ -83,8 +111,18 @@ export class DatabaseCipherService {
       key: bytesToHex(key.bytes),
       kdf,
     };
+    const canRekey = this.keyedDatabases.has(db);
+    const isFresh = this.freshDatabases.has(db);
+    if (!canRekey && !isFresh) {
+      throw new Error('Nie można zaszyfrować istniejącej bazy bez jej wcześniejszej migracji.');
+    }
     await this.storeState(nextState);
-    await this.rekey(db, nextState.key);
+    if (canRekey) {
+      await this.rekey(db, nextState.key);
+    } else {
+      await this.applyKey(db, nextState.key);
+      this.freshDatabases.delete(db);
+    }
     await this.verifyKey(db);
     this.keyedDatabases.add(db);
     await migrateDatabase(db);
@@ -110,8 +148,18 @@ export class DatabaseCipherService {
       key: bytesToHex(key.bytes),
       kdf,
     };
+    const canRekey = this.keyedDatabases.has(db);
+    const isFresh = this.freshDatabases.has(db);
+    if (!canRekey && !isFresh) {
+      throw new Error('Nie można zaszyfrować istniejącej bazy bez jej wcześniejszej migracji.');
+    }
     await this.storeState(state);
-    await this.rekey(db, state.key);
+    if (canRekey) {
+      await this.rekey(db, state.key);
+    } else {
+      await this.applyKey(db, state.key);
+      this.freshDatabases.delete(db);
+    }
     await this.verifyKey(db);
     this.keyedDatabases.add(db);
     await db.execAsync('PRAGMA journal_mode = DELETE;');

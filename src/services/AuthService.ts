@@ -22,11 +22,17 @@ export class AuthService {
   ) {}
 
   hasVault(): Promise<boolean> {
+    if (this.databaseCipher.isFreshDatabase(this.db)) return Promise.resolve(false);
     return this.metadataRepository.exists();
   }
 
   async createVault(masterPassword: string): Promise<void> {
-    if (await this.metadataRepository.exists()) throw new Error('Sejf już istnieje.');
+    if (
+      !this.databaseCipher.isFreshDatabase(this.db) &&
+      await this.metadataRepository.exists()
+    ) {
+      throw new Error('Sejf już istnieje.');
+    }
     const saltBytes = this.random.bytes(16);
     const kdf: KdfMetadata = { ...DEFAULT_KDF_PARAMETERS, salt: bytesToHex(saltBytes) };
     saltBytes.fill(0);
@@ -81,7 +87,10 @@ export class AuthService {
   }
 
   async restoreFromBackup(masterPassword: string, backupDb: SQLiteDatabase, kdf: KdfMetadata): Promise<void> {
-    if (await this.metadataRepository.exists()) {
+    if (
+      !this.databaseCipher.isFreshDatabase(this.db) &&
+      await this.metadataRepository.exists()
+    ) {
       throw new Error('Import jest dostępny tylko podczas konfiguracji pustego sejfu.');
     }
 

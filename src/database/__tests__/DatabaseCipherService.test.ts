@@ -3,6 +3,14 @@ import type { SecureStorageService } from '@/security/SecureStorageService';
 import type { KdfMetadata, SecretKey } from '@/crypto/types';
 import { DatabaseCipherService } from '../DatabaseCipherService';
 
+let mockDatabaseFileSize = 0;
+
+jest.mock('expo-file-system', () => ({
+  File: class MockFile {
+    info() { return { exists: true, size: mockDatabaseFileSize }; }
+  },
+}));
+
 const kdf: KdfMetadata = {
   algorithm: 'argon2id',
   version: 1,
@@ -15,6 +23,7 @@ const kdf: KdfMetadata = {
 function createDb(cipherAvailable = true) {
   const calls: string[] = [];
   const db = {
+    databasePath: 'file:///cache/vaultly.db',
     execAsync: jest.fn(async (sql: string) => { calls.push(sql); }),
     getFirstAsync: jest.fn(async (sql: string) => {
       calls.push(sql);
@@ -72,26 +81,31 @@ describe('DatabaseCipherService', () => {
     expect(JSON.parse(read() ?? '{}')).toMatchObject({ status: 'ready', key: 'ab'.repeat(32), kdf });
   });
 
-  it('rekeys a fresh database after it has already been queried', async () => {
+  it('sets the key before any query on a fresh database', async () => {
+    mockDatabaseFileSize = 0;
     const { storage } = createStorage();
     const { db, calls } = createDb();
     const service = new DatabaseCipherService(storage);
     const key: SecretKey = { bytes: new Uint8Array(32).fill(0xab) };
 
-    await db.getFirstAsync('SELECT COUNT(*) AS count FROM sqlite_master');
+    await service.initialize(db);
+    expect(service.isFreshDatabase(db)).toBe(true);
+    expect(calls).toHaveLength(0);
+
     await service.encryptNewDatabase(db, key, kdf);
 
-    expect(calls).toContain('PRAGMA wal_checkpoint(TRUNCATE)');
-    expect(calls).toContain(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
-    expect(calls).not.toContain(`PRAGMA key = "x'${'ab'.repeat(32)}'";`);
+    expect(calls[0]).toBe(`PRAGMA key = "x'${'ab'.repeat(32)}'";`);
+    expect(calls).not.toContain(`PRAGMA rekey = "x'${'ab'.repeat(32)}'";`);
   });
 
   it('refuses to proceed when the native build does not expose SQLCipher', async () => {
+    mockDatabaseFileSize = 0;
     const { storage } = createStorage();
     const { db } = createDb(false);
     const service = new DatabaseCipherService(storage);
     const key: SecretKey = { bytes: new Uint8Array(32).fill(0xab) };
 
+    await service.initialize(db);
     await expect(service.encryptNewDatabase(db, key, kdf)).rejects.toThrow('SQLCipher nie jest dostępny');
   });
 });

@@ -10,7 +10,8 @@ import { AuthService } from '../AuthService';
 
 class MemoryMetadataRepository implements VaultMetadataRepository {
   value: VaultMetadata | null = null;
-  async exists() { return this.value !== null; }
+  existsCalls = 0;
+  async exists() { this.existsCalls += 1; return this.value !== null; }
   async get() { return this.value; }
   async create(metadata: VaultMetadata) { this.value = metadata; }
 }
@@ -32,6 +33,7 @@ class FakeDatabaseCipher {
   }
   async restoreDatabase() { this.restorations += 1; }
   async getState() { return this.state; }
+  isFreshDatabase() { return !this.keyed; }
   isKeyed() { return this.keyed; }
 }
 
@@ -74,6 +76,7 @@ describe('AuthService', () => {
     expect(JSON.stringify(repository.value)).not.toContain('test-only-passphrase');
     expect(databaseCipher.keyed).toBe(true);
     expect(databaseCipher.state?.status).toBe('ready');
+    expect(repository.existsCalls).toBe(0);
   });
 
   it('odblokowuje prawidłowym hasłem i odrzuca błędne', async () => {

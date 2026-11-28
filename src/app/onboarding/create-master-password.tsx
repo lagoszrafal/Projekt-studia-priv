@@ -24,8 +24,12 @@ export default function CreateMasterPasswordScreen() {
     try {
       await createAuthService(db).createVault(password);
       router.replace('/onboarding/biometrics');
-    } catch {
-      setServiceError('Nie udało się utworzyć sejfu. Spróbuj ponownie.');
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? `Nie udało się utworzyć sejfu: ${error.message}`
+          : 'Nie udało się utworzyć sejfu. Spróbuj ponownie.',
+      );
     } finally {
       setPassword('');
       setConfirmation('');
